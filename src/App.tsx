@@ -1,70 +1,136 @@
 import { FormEvent, useState } from 'react';
+import { getChatIdByPhone, sendMessage } from './api/greenApi';
 import styles from './App.module.scss';
 
 type Message = {
-  id: number;
+  id: string;
   text: string;
   time: string;
-  direction: 'incoming' | 'outgoing';
+  direction: 'outgoing';
 };
 
-const initialMessages: Message[] = [
-  {
-    id: 1,
-    text: 'Привет! Это временное сообщение для проверки вида чата.',
-    time: '17:22',
-    direction: 'incoming',
-  },
-  {
-    id: 2,
-    text: 'На первом этапе API еще не подключаем, только собираем интерфейс.',
-    time: '17:24',
-    direction: 'outgoing',
-  },
-  {
-    id: 3,
-    text: 'Позже здесь появятся сообщения MAX через GREEN-API.',
-    time: '17:25',
-    direction: 'incoming',
-  },
-];
+const formatMessageTime = () =>
+  new Intl.DateTimeFormat('ru-RU', {
+    hour: '2-digit',
+    minute: '2-digit',
+  }).format(new Date());
 
 function App() {
   const [idInstance, setIdInstance] = useState('');
   const [apiTokenInstance, setApiTokenInstance] = useState('');
   const [phone, setPhone] = useState('');
   const [activeChat, setActiveChat] = useState('');
+  const [activeChatId, setActiveChatId] = useState('');
   const [draft, setDraft] = useState('');
-  const [messages, setMessages] = useState<Message[]>(initialMessages);
+  const [messages, setMessages] = useState<Message[]>([]);
+  const [error, setError] = useState('');
+  const [isOpeningChat, setIsOpeningChat] = useState(false);
+  const [isSending, setIsSending] = useState(false);
 
   const chatTitle = activeChat || 'Получатель не выбран';
 
-  const openChat = (event: FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
-    setActiveChat(phone.trim());
+  const handlePhoneChange = (value: string) => {
+    setPhone(value);
+
+    if (activeChat) {
+      setActiveChat('');
+      setActiveChatId('');
+      setMessages([]);
+    }
   };
 
-  const sendMessage = (event: FormEvent<HTMLFormElement>) => {
+  const openChat = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
 
+    const trimmedIdInstance = idInstance.trim();
+    const trimmedApiTokenInstance = apiTokenInstance.trim();
+    const trimmedPhone = phone.trim();
+
+    if (!trimmedIdInstance || !trimmedApiTokenInstance) {
+      setError('Введите idInstance и apiTokenInstance.');
+      return;
+    }
+
+    if (!trimmedPhone) {
+      setError('Введите номер телефона получателя.');
+      return;
+    }
+
+    setIsOpeningChat(true);
+    setError('');
+
+    try {
+      const chatId = await getChatIdByPhone({
+        idInstance: trimmedIdInstance,
+        apiTokenInstance: trimmedApiTokenInstance,
+        phoneNumber: trimmedPhone,
+      });
+
+      setActiveChat(trimmedPhone);
+      setActiveChatId(chatId);
+      setMessages([]);
+    } catch (requestError) {
+      setActiveChat('');
+      setActiveChatId('');
+      setError(
+        requestError instanceof Error
+          ? requestError.message
+          : 'Не удалось открыть чат с получателем.',
+      );
+    } finally {
+      setIsOpeningChat(false);
+    }
+  };
+
+  const handleSendMessage = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+
+    const trimmedIdInstance = idInstance.trim();
+    const trimmedApiTokenInstance = apiTokenInstance.trim();
     const text = draft.trim();
+
     if (!text) {
       return;
     }
 
-    setMessages((currentMessages) => [
-      ...currentMessages,
-      {
-        id: Date.now(),
-        text,
-        time: new Intl.DateTimeFormat('ru-RU', {
-          hour: '2-digit',
-          minute: '2-digit',
-        }).format(new Date()),
-        direction: 'outgoing',
-      },
-    ]);
-    setDraft('');
+    if (!trimmedIdInstance || !trimmedApiTokenInstance) {
+      setError('Введите idInstance и apiTokenInstance.');
+      return;
+    }
+
+    if (!activeChatId) {
+      setError('Сначала откройте чат с получателем.');
+      return;
+    }
+
+    setIsSending(true);
+    setError('');
+
+    try {
+      const response = await sendMessage({
+        idInstance: trimmedIdInstance,
+        apiTokenInstance: trimmedApiTokenInstance,
+        chatId: activeChatId,
+        message: text,
+      });
+
+      setMessages((currentMessages) => [
+        ...currentMessages,
+        {
+          id: response.idMessage,
+          text,
+          time: formatMessageTime(),
+          direction: 'outgoing',
+        },
+      ]);
+      setDraft('');
+    } catch (requestError) {
+      setError(
+        requestError instanceof Error ? requestError.message : 'Не удалось отправить сообщение.',
+      );
+    } finally {
+      setIsSending(false);
+    }
   };
 
   return (
@@ -82,7 +148,7 @@ function App() {
           <form className={styles.panel}>
             <div className={styles.panelHeader}>
               <h2>Подключение</h2>
-              <span>Этап 1</span>
+              <span>Этап 2</span>
             </div>
 
             <label className={styles.field}>
@@ -108,6 +174,8 @@ function App() {
             </label>
           </form>
 
+          {error && <p className={styles.error}>{error}</p>}
+
           <form className={styles.panel} onSubmit={openChat}>
             <div className={styles.panelHeader}>
               <h2>Получатель</h2>
@@ -118,14 +186,18 @@ function App() {
               <input
                 type="tel"
                 value={phone}
-                onChange={(event) => setPhone(event.target.value)}
+                onChange={(event) => handlePhoneChange(event.target.value)}
                 placeholder="79990000000"
                 autoComplete="off"
               />
             </label>
 
-            <button className={styles.primaryButton} type="submit">
-              Открыть чат
+            <button
+              className={styles.primaryButton}
+              type="submit"
+              disabled={isOpeningChat || !phone.trim()}
+            >
+              {isOpeningChat ? 'Открываем...' : 'Открыть чат'}
             </button>
           </form>
         </aside>
@@ -137,31 +209,41 @@ function App() {
             </div>
             <div>
               <h2>{chatTitle}</h2>
-              <p>{activeChat ? 'Готов к отправке сообщений' : 'Укажите получателя слева'}</p>
+              <p>
+                {activeChatId
+                  ? `chatId: ${activeChatId}`
+                  : 'Укажите получателя слева и откройте чат'}
+              </p>
             </div>
           </header>
 
           <div className={styles.messages} aria-label="Сообщения">
-            {messages.map((message) => (
-              <article
-                className={`${styles.message} ${styles[message.direction]}`}
-                key={message.id}
-              >
-                <p>{message.text}</p>
-                <time>{message.time}</time>
-              </article>
-            ))}
+            {messages.length === 0 ? (
+              <p className={styles.emptyState}>
+                Здесь появятся отправленные сообщения. Получение входящих будет добавлено отдельно.
+              </p>
+            ) : (
+              messages.map((message) => (
+                <article
+                  className={`${styles.message} ${styles[message.direction]}`}
+                  key={message.id}
+                >
+                  <p>{message.text}</p>
+                  <time>{message.time}</time>
+                </article>
+              ))
+            )}
           </div>
 
-          <form className={styles.composer} onSubmit={sendMessage}>
+          <form className={styles.composer} onSubmit={handleSendMessage}>
             <input
               type="text"
               value={draft}
               onChange={(event) => setDraft(event.target.value)}
               placeholder="Напишите сообщение..."
             />
-            <button type="submit" disabled={!draft.trim()}>
-              Отправить
+            <button type="submit" disabled={!draft.trim() || isSending}>
+              {isSending ? 'Отправка...' : 'Отправить'}
             </button>
           </form>
         </section>

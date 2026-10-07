@@ -146,12 +146,24 @@
   transform: translateY(-1px);
 }
 
+.primaryButton:disabled,
 .composer button:disabled {
   color: #8b93a1;
   background: #e6ebf2;
   box-shadow: none;
   cursor: default;
   transform: none;
+}
+
+.error {
+  margin: 0;
+  padding: 12px 14px;
+  color: #9f1d35;
+  font-size: 13px;
+  line-height: 1.4;
+  background: #fff1f3;
+  border: 1px solid #ffd4dc;
+  border-radius: 14px;
 }
 
 .chat {
@@ -206,6 +218,15 @@
   gap: 10px;
   padding: 24px;
   overflow-y: auto;
+}
+
+.emptyState {
+  align-self: center;
+  max-width: 320px;
+  margin: auto;
+  color: #8b93a1;
+  line-height: 1.45;
+  text-align: center;
 }
 
 .message {
