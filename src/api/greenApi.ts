@@ -88,6 +88,11 @@ export const getChatIdByPhone = async ({
   phoneNumber,
 }: CheckAccountRequest) => {
   const normalizedPhone = phoneNumber.replace(/\D/g, '');
+
+  if (!normalizedPhone) {
+    throw new Error('Введите корректный номер телефона.');
+  }
+
   const response = await requestGreenApi<CheckAccountResponse | CheckAccountErrorResponse>(
     buildGreenApiUrl(idInstance, 'checkAccount', apiTokenInstance),
     {

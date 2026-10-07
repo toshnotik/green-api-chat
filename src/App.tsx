@@ -29,14 +29,25 @@ function App() {
 
   const chatTitle = activeChat || 'Получатель не выбран';
 
+  const resetActiveChat = () => {
+    setActiveChat('');
+    setActiveChatId('');
+    setMessages([]);
+  };
+
+  const handleIdInstanceChange = (value: string) => {
+    setIdInstance(value);
+    resetActiveChat();
+  };
+
+  const handleApiTokenInstanceChange = (value: string) => {
+    setApiTokenInstance(value);
+    resetActiveChat();
+  };
+
   const handlePhoneChange = (value: string) => {
     setPhone(value);
-
-    if (activeChat) {
-      setActiveChat('');
-      setActiveChatId('');
-      setMessages([]);
-    }
+    resetActiveChat();
   };
 
   const openChat = async (event: FormEvent<HTMLFormElement>) => {
@@ -148,7 +159,6 @@ function App() {
           <form className={styles.panel}>
             <div className={styles.panelHeader}>
               <h2>Подключение</h2>
-              <span>Этап 2</span>
             </div>
 
             <label className={styles.field}>
@@ -156,7 +166,7 @@ function App() {
               <input
                 type="text"
                 value={idInstance}
-                onChange={(event) => setIdInstance(event.target.value)}
+                onChange={(event) => handleIdInstanceChange(event.target.value)}
                 placeholder="1101000000"
                 autoComplete="off"
               />
@@ -167,7 +177,7 @@ function App() {
               <input
                 type="password"
                 value={apiTokenInstance}
-                onChange={(event) => setApiTokenInstance(event.target.value)}
+                onChange={(event) => handleApiTokenInstanceChange(event.target.value)}
                 placeholder="Введите токен"
                 autoComplete="off"
               />
