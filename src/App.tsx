@@ -1,4 +1,4 @@
-import { FormEvent, useEffect, useState } from 'react';
+import { FormEvent, useEffect, useRef, useState } from 'react';
 import {
   deleteNotification,
   getChatIdByPhone,
@@ -47,8 +47,16 @@ function App() {
   const [error, setError] = useState('');
   const [isOpeningChat, setIsOpeningChat] = useState(false);
   const [isSending, setIsSending] = useState(false);
+  const messagesRef = useRef<HTMLDivElement>(null);
 
   const chatTitle = activeChat || 'Получатель не выбран';
+
+  useEffect(() => {
+    messagesRef.current?.scrollTo({
+      top: messagesRef.current.scrollHeight,
+      behavior: 'smooth',
+    });
+  }, [messages]);
 
   useEffect(() => {
     const trimmedIdInstance = idInstance.trim();
@@ -290,7 +298,12 @@ function App() {
             <button
               className={styles.primaryButton}
               type="submit"
-              disabled={isOpeningChat || !phone.trim()}
+              disabled={
+                isOpeningChat ||
+                !idInstance.trim() ||
+                !apiTokenInstance.trim() ||
+                !phone.trim()
+              }
             >
               {isOpeningChat ? 'Открываем...' : 'Открыть чат'}
             </button>
@@ -312,7 +325,7 @@ function App() {
             </div>
           </header>
 
-          <div className={styles.messages} aria-label="Сообщения">
+          <div className={styles.messages} aria-label="Сообщения" ref={messagesRef}>
             {messages.length === 0 ? (
               <p className={styles.emptyState}>Сообщений пока нет.</p>
             ) : (
@@ -334,8 +347,9 @@ function App() {
               value={draft}
               onChange={(event) => setDraft(event.target.value)}
               placeholder="Напишите сообщение..."
+              disabled={!activeChatId || isSending}
             />
-            <button type="submit" disabled={!draft.trim() || isSending}>
+            <button type="submit" disabled={!draft.trim() || !activeChatId || isSending}>
               {isSending ? 'Отправка...' : 'Отправить'}
             </button>
           </form>

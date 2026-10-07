@@ -9,8 +9,8 @@
 
 .shell {
   display: grid;
-  grid-template-columns: 340px minmax(0, 1fr);
-  width: min(1180px, 100%);
+  grid-template-columns: minmax(300px, 352px) minmax(0, 1fr);
+  width: min(1160px, 100%);
   min-height: calc(100vh - 48px);
   margin: 0 auto;
   overflow: hidden;
@@ -65,7 +65,7 @@
   display: flex;
   flex-direction: column;
   gap: 14px;
-  padding: 18px;
+  padding: 16px;
   background: #ffffff;
   border: 1px solid #e5eaf1;
   border-radius: 18px;
@@ -79,7 +79,8 @@
 
   h2 {
     margin: 0;
-    font-size: 17px;
+    font-size: 16px;
+    line-height: 1.25;
   }
 
   span {
@@ -120,6 +121,10 @@
     border-color: #7c89ff;
     box-shadow: 0 0 0 4px rgba(124, 137, 255, 0.14);
   }
+
+  input::placeholder {
+    color: #9aa4b2;
+  }
 }
 
 .primaryButton,
@@ -144,6 +149,13 @@
   background: #4354df;
   box-shadow: 0 12px 24px rgba(79, 99, 255, 0.2);
   transform: translateY(-1px);
+}
+
+.primaryButton:disabled:hover,
+.composer button:disabled:hover {
+  background: #e6ebf2;
+  box-shadow: none;
+  transform: none;
 }
 
 .primaryButton:disabled,
@@ -197,6 +209,7 @@
     margin: 4px 0 0;
     color: #778195;
     font-size: 13px;
+    overflow-wrap: anywhere;
   }
 }
 
@@ -217,7 +230,9 @@
   flex-direction: column;
   gap: 10px;
   padding: 24px;
+  min-height: 0;
   overflow-y: auto;
+  scroll-behavior: smooth;
 }
 
 .emptyState {
@@ -232,7 +247,7 @@
 .message {
   width: fit-content;
   max-width: min(620px, 76%);
-  padding: 10px 12px 7px;
+  padding: 10px 13px 7px;
   border-radius: 18px;
   box-shadow: 0 8px 22px rgba(43, 57, 84, 0.08);
 
@@ -240,6 +255,7 @@
     margin: 0;
     line-height: 1.42;
     overflow-wrap: anywhere;
+    white-space: pre-wrap;
   }
 
   time {
@@ -255,6 +271,7 @@
   align-self: flex-start;
   color: #1f2937;
   background: #ffffff;
+  border: 1px solid #e8edf4;
   border-bottom-left-radius: 7px;
 }
 
@@ -283,12 +300,21 @@
     border: 1px solid transparent;
     border-radius: 16px;
     outline: none;
+    transition:
+      border-color 160ms ease,
+      background 160ms ease,
+      box-shadow 160ms ease;
   }
 
   input:focus {
     background: #ffffff;
     border-color: #7c89ff;
     box-shadow: 0 0 0 4px rgba(124, 137, 255, 0.14);
+  }
+
+  input:disabled {
+    color: #8b93a1;
+    cursor: default;
   }
 }
 
