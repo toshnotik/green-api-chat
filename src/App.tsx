@@ -1,19 +1,40 @@
-import { FormEvent, useState } from 'react';
-import { getChatIdByPhone, sendMessage } from './api/greenApi';
+import { FormEvent, useEffect, useState } from 'react';
+import {
+  deleteNotification,
+  getChatIdByPhone,
+  IncomingNotificationBody,
+  IncomingTextMessageNotification,
+  receiveNotification,
+  sendMessage,
+} from './api/greenApi';
 import styles from './App.module.scss';
 
 type Message = {
   id: string;
   text: string;
   time: string;
-  direction: 'outgoing';
+  direction: 'incoming' | 'outgoing';
 };
 
-const formatMessageTime = () =>
+const POLLING_ERROR_DELAY = 2000;
+
+const delay = (ms: number) => new Promise((resolve) => window.setTimeout(resolve, ms));
+
+const formatMessageTime = (timestamp?: number) =>
   new Intl.DateTimeFormat('ru-RU', {
     hour: '2-digit',
     minute: '2-digit',
-  }).format(new Date());
+  }).format(timestamp ? new Date(timestamp * 1000) : new Date());
+
+const isIncomingTextMessage = (
+  notification: IncomingNotificationBody,
+): notification is IncomingTextMessageNotification =>
+  notification.typeWebhook === 'incomingMessageReceived' &&
+  notification.messageData?.typeMessage === 'textMessage' &&
+  typeof notification.messageData.textMessageData?.textMessage === 'string' &&
+  typeof notification.senderData?.chatId === 'string' &&
+  typeof notification.idMessage === 'string' &&
+  typeof notification.timestamp === 'number';
 
 function App() {
   const [idInstance, setIdInstance] = useState('');
@@ -28,6 +49,70 @@ function App() {
   const [isSending, setIsSending] = useState(false);
 
   const chatTitle = activeChat || 'Получатель не выбран';
+
+  useEffect(() => {
+    const trimmedIdInstance = idInstance.trim();
+    const trimmedApiTokenInstance = apiTokenInstance.trim();
+
+    if (!activeChatId || !trimmedIdInstance || !trimmedApiTokenInstance) {
+      return;
+    }
+
+    let isActive = true;
+
+    const pollNotifications = async () => {
+      while (isActive) {
+        try {
+          const notification = await receiveNotification({
+            idInstance: trimmedIdInstance,
+            apiTokenInstance: trimmedApiTokenInstance,
+          });
+
+          if (!isActive) {
+            return;
+          }
+
+          if (!notification?.receiptId) {
+            continue;
+          }
+
+          const { body, receiptId } = notification;
+          const shouldShowMessage =
+            isIncomingTextMessage(body) && body.senderData.chatId === activeChatId;
+
+          await deleteNotification({
+            idInstance: trimmedIdInstance,
+            apiTokenInstance: trimmedApiTokenInstance,
+            receiptId,
+          });
+
+          if (!isActive || !shouldShowMessage || !isIncomingTextMessage(body)) {
+            continue;
+          }
+
+          setMessages((currentMessages) => [
+            ...currentMessages,
+            {
+              id: body.idMessage,
+              text: body.messageData.textMessageData.textMessage,
+              time: formatMessageTime(body.timestamp),
+              direction: 'incoming',
+            },
+          ]);
+        } catch {
+          if (isActive) {
+            await delay(POLLING_ERROR_DELAY);
+          }
+        }
+      }
+    };
+
+    void pollNotifications();
+
+    return () => {
+      isActive = false;
+    };
+  }, [activeChatId, apiTokenInstance, idInstance]);
 
   const resetActiveChat = () => {
     setActiveChat('');
@@ -229,9 +314,7 @@ function App() {
 
           <div className={styles.messages} aria-label="Сообщения">
             {messages.length === 0 ? (
-              <p className={styles.emptyState}>
-                Здесь появятся отправленные сообщения. Получение входящих будет добавлено отдельно.
-              </p>
+              <p className={styles.emptyState}>Сообщений пока нет.</p>
             ) : (
               messages.map((message) => (
                 <article
