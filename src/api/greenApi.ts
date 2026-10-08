@@ -3,11 +3,7 @@ type GreenApiCredentials = {
   apiTokenInstance: string;
 };
 
-type GreenApiMethod =
-  | 'checkAccount'
-  | 'sendMessage'
-  | 'receiveNotification'
-  | 'deleteNotification';
+type GreenApiMethod = 'checkAccount' | 'sendMessage' | 'receiveNotification' | 'deleteNotification';
 
 type CheckAccountRequest = GreenApiCredentials & {
   phoneNumber: string;
@@ -98,7 +94,9 @@ const getErrorMessage = (data: unknown, fallback: string) => {
   }
 
   const errorData = data as GreenApiErrorResponse;
-  return errorData.reason || errorData.message || errorData.description || errorData.error || fallback;
+  return (
+    errorData.reason || errorData.message || errorData.description || errorData.error || fallback
+  );
 };
 
 const requestGreenApi = async <TResponse>(
@@ -138,10 +136,12 @@ export const getChatIdByPhone = async ({
   apiTokenInstance,
   phoneNumber,
 }: CheckAccountRequest) => {
-  const normalizedPhone = phoneNumber.replace(/\D/g, '');
+  const normalizedPhone = phoneNumber.trim();
 
-  if (!normalizedPhone) {
-    throw new Error('Введите корректный номер телефона.');
+  if (!/^(?:7\d{10}|375\d{9})$/.test(normalizedPhone)) {
+    throw new Error(
+      'Введите международный номер: 11 цифр с кодом 7 или 12 цифр с кодом 375, без + и пробелов.',
+    );
   }
 
   const response = await requestGreenApi<CheckAccountResponse | CheckAccountErrorResponse>(
@@ -171,18 +171,18 @@ export const sendMessage = ({
   chatId,
   message,
 }: SendMessageRequest) =>
-  requestGreenApi<SendMessageResponse>(buildGreenApiUrl(idInstance, 'sendMessage', apiTokenInstance), {
-    method: 'POST',
-    body: JSON.stringify({
-      chatId,
-      message,
-    }),
-  });
+  requestGreenApi<SendMessageResponse>(
+    buildGreenApiUrl(idInstance, 'sendMessage', apiTokenInstance),
+    {
+      method: 'POST',
+      body: JSON.stringify({
+        chatId,
+        message,
+      }),
+    },
+  );
 
-export const receiveNotification = ({
-  idInstance,
-  apiTokenInstance,
-}: GreenApiCredentials) =>
+export const receiveNotification = ({ idInstance, apiTokenInstance }: GreenApiCredentials) =>
   requestGreenApi<ReceiveNotificationResponse | null>(
     `${buildGreenApiUrl(idInstance, 'receiveNotification', apiTokenInstance)}?receiveTimeout=5`,
     {
