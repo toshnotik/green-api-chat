@@ -242,7 +242,13 @@ function App() {
       <section className={styles.shell} aria-label="GREEN-API MAX chat">
         <aside className={styles.sidebar}>
           <div className={styles.brand}>
-            <span className={styles.logo} aria-hidden="true" />
+            <img
+              className={styles.logo}
+              src={`${import.meta.env.BASE_URL}max-logo.svg`}
+              alt=""
+              width="42"
+              height="42"
+            />
             <div>
               <p className={styles.eyebrow}>GREEN-API</p>
               <h1>MAX Chat</h1>

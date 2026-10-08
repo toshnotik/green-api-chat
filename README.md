@@ -2,16 +2,18 @@
 
 [![CI](https://github.com/toshnotik/green-api-chat/actions/workflows/ci.yml/badge.svg)](https://github.com/toshnotik/green-api-chat/actions/workflows/ci.yml)
 
-React-приложение для отправки и получения текстовых сообщений в MAX через GREEN-API.
+Демонстрационное тестовое React-приложение для отправки и получения текстовых сообщений
+в MAX через GREEN-API. Не является официальным клиентом MAX.
 
 ## Demo
 
 [Live demo](https://toshnotik.github.io/green-api-chat/)
 
+![Интерфейс GREEN-API MAX Chat](docs/screenshot.png)
+
 ## Возможности
 
 - подключение по `idInstance` и `apiTokenInstance`;
-- проверка MAX-аккаунта по номеру;
 - открытие чата;
 - отправка текстовых сообщений;
 - получение входящих сообщений через HTTP API;
