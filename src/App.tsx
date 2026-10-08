@@ -18,6 +18,13 @@ type Message = {
 
 const POLLING_ERROR_DELAY = 2000;
 
+const connectionLabels = {
+  idle: 'Чат не открыт',
+  connecting: 'Подключение...',
+  connected: 'На связи',
+  retrying: 'Сбой связи · повторяем',
+};
+
 const delay = (ms: number) => new Promise((resolve) => window.setTimeout(resolve, ms));
 
 const formatMessageTime = (timestamp?: number) =>
@@ -47,9 +54,20 @@ function App() {
   const [error, setError] = useState('');
   const [isOpeningChat, setIsOpeningChat] = useState(false);
   const [isSending, setIsSending] = useState(false);
+  const [chatOperation, setChatOperation] = useState(0);
+  const [connectionStatus, setConnectionStatus] = useState<keyof typeof connectionLabels>('idle');
   const messagesRef = useRef<HTMLDivElement>(null);
+  const operationRef = useRef(0);
+  const pollingRef = useRef<Promise<void> | null>(null);
 
   const chatTitle = activeChat || 'Получатель не выбран';
+
+  useEffect(
+    () => () => {
+      operationRef.current += 1;
+    },
+    [],
+  );
 
   useEffect(() => {
     messagesRef.current?.scrollTo({
@@ -67,20 +85,25 @@ function App() {
     }
 
     let isActive = true;
+    const operation = operationRef.current;
+    const isCurrent = () => isActive && operationRef.current === operation;
+    setConnectionStatus('connecting');
 
     const pollNotifications = async () => {
-      while (isActive) {
+      while (isCurrent()) {
         try {
           const notification = await receiveNotification({
             idInstance: trimmedIdInstance,
             apiTokenInstance: trimmedApiTokenInstance,
           });
 
-          if (!isActive) {
+          if (!isCurrent()) {
             return;
           }
 
           if (!notification?.receiptId) {
+            setConnectionStatus('connected');
+            await delay(250);
             continue;
           }
 
@@ -94,7 +117,13 @@ function App() {
             receiptId,
           });
 
-          if (!isActive || !shouldShowMessage || !isIncomingTextMessage(body)) {
+          if (!isCurrent()) {
+            return;
+          }
+
+          setConnectionStatus('connected');
+
+          if (!shouldShowMessage || !isIncomingTextMessage(body)) {
             continue;
           }
 
@@ -108,24 +137,37 @@ function App() {
             },
           ]);
         } catch {
-          if (isActive) {
+          if (isCurrent()) {
+            setConnectionStatus('retrying');
             await delay(POLLING_ERROR_DELAY);
           }
         }
       }
     };
 
-    void pollNotifications();
+    // Wait for the previous receive/delete request before starting another loop.
+    const previousPolling = pollingRef.current;
+    pollingRef.current = (async () => {
+      await previousPolling;
+      if (isCurrent()) {
+        await pollNotifications();
+      }
+    })();
 
     return () => {
       isActive = false;
     };
-  }, [activeChatId, apiTokenInstance, idInstance]);
+  }, [activeChatId, apiTokenInstance, idInstance, chatOperation]);
 
   const resetActiveChat = () => {
+    operationRef.current += 1;
     setActiveChat('');
     setActiveChatId('');
     setMessages([]);
+    setError('');
+    setIsOpeningChat(false);
+    setIsSending(false);
+    setConnectionStatus('idle');
   };
 
   const handleIdInstanceChange = (value: string) => {
@@ -145,6 +187,8 @@ function App() {
 
   const openChat = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
+    resetActiveChat();
+    const operation = operationRef.current;
 
     const trimmedIdInstance = idInstance.trim();
     const trimmedApiTokenInstance = apiTokenInstance.trim();
@@ -170,10 +214,18 @@ function App() {
         phoneNumber: trimmedPhone,
       });
 
+      if (operationRef.current !== operation) {
+        return;
+      }
+
       setActiveChat(trimmedPhone);
       setActiveChatId(chatId);
+      setChatOperation(operation);
       setMessages([]);
     } catch (requestError) {
+      if (operationRef.current !== operation) {
+        return;
+      }
       setActiveChat('');
       setActiveChatId('');
       setError(
@@ -182,12 +234,15 @@ function App() {
           : 'Не удалось открыть чат с получателем.',
       );
     } finally {
-      setIsOpeningChat(false);
+      if (operationRef.current === operation) {
+        setIsOpeningChat(false);
+      }
     }
   };
 
   const handleSendMessage = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
+    const operation = operationRef.current;
 
     const trimmedIdInstance = idInstance.trim();
     const trimmedApiTokenInstance = apiTokenInstance.trim();
@@ -218,6 +273,10 @@ function App() {
         message: text,
       });
 
+      if (operationRef.current !== operation) {
+        return;
+      }
+
       setMessages((currentMessages) => [
         ...currentMessages,
         {
@@ -229,11 +288,16 @@ function App() {
       ]);
       setDraft('');
     } catch (requestError) {
+      if (operationRef.current !== operation) {
+        return;
+      }
       setError(
         requestError instanceof Error ? requestError.message : 'Не удалось отправить сообщение.',
       );
     } finally {
-      setIsSending(false);
+      if (operationRef.current === operation) {
+        setIsSending(false);
+      }
     }
   };
 
@@ -305,10 +369,7 @@ function App() {
               className={styles.primaryButton}
               type="submit"
               disabled={
-                isOpeningChat ||
-                !idInstance.trim() ||
-                !apiTokenInstance.trim() ||
-                !phone.trim()
+                isOpeningChat || !idInstance.trim() || !apiTokenInstance.trim() || !phone.trim()
               }
             >
               {isOpeningChat ? 'Открываем...' : 'Открыть чат'}
@@ -329,6 +390,9 @@ function App() {
                   : 'Укажите получателя слева и откройте чат'}
               </p>
             </div>
+            <p className={styles.connectionStatus} data-state={connectionStatus} role="status">
+              {connectionLabels[connectionStatus]}
+            </p>
           </header>
 
           <div className={styles.messages} aria-label="Сообщения" ref={messagesRef}>

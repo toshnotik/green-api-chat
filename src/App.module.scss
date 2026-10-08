@@ -195,8 +195,9 @@
   background: #ffffff;
   border-bottom: 1px solid #e8e9ed;
 
-  > div:last-child {
+  > div:nth-child(2) {
     min-width: 0;
+    flex: 1;
   }
 
   h2 {
@@ -213,6 +214,31 @@
     font-size: 12px;
     line-height: 1.4;
     overflow-wrap: anywhere;
+  }
+}
+
+.chatHeader .connectionStatus {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 6px;
+  margin: 0;
+  font-size: 12px;
+
+  &::before {
+    width: 6px;
+    height: 6px;
+    content: '';
+    background: #858894;
+    border-radius: 50%;
+  }
+
+  &[data-state='connected']::before {
+    background: #22865a;
+  }
+
+  &[data-state='retrying']::before {
+    background: #b57b17;
   }
 }
 
@@ -333,6 +359,14 @@
   .chatHeader,
   .messages {
     padding: 16px;
+  }
+
+  .chatHeader {
+    flex-wrap: wrap;
+  }
+
+  .chatHeader .connectionStatus {
+    width: 100%;
   }
 
   .composer {
