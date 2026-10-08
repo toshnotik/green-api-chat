@@ -3,6 +3,12 @@ type GreenApiCredentials = {
   apiTokenInstance: string;
 };
 
+type GreenApiMethod =
+  | 'checkAccount'
+  | 'sendMessage'
+  | 'receiveNotification'
+  | 'deleteNotification';
+
 type CheckAccountRequest = GreenApiCredentials & {
   phoneNumber: string;
 };
@@ -35,13 +41,56 @@ export type SendMessageResponse = {
   idMessage: string;
 };
 
+export type IncomingTextMessageNotification = {
+  typeWebhook: 'incomingMessageReceived';
+  timestamp: number;
+  idMessage: string;
+  senderData: {
+    chatId: string;
+  };
+  messageData: {
+    typeMessage: 'textMessage';
+    textMessageData: {
+      textMessage: string;
+    };
+  };
+};
+
+export type IncomingNotificationBody =
+  | IncomingTextMessageNotification
+  | {
+      typeWebhook: string;
+      timestamp?: number;
+      idMessage?: string;
+      senderData?: {
+        chatId?: string;
+      };
+      messageData?: {
+        typeMessage?: string;
+        textMessageData?: {
+          textMessage?: string;
+        };
+      };
+    };
+
+export type ReceiveNotificationResponse = {
+  receiptId: number;
+  body: IncomingNotificationBody;
+};
+
+export type DeleteNotificationResponse = {
+  result: boolean;
+  reason: string;
+};
+
 const API_URL = 'https://api.green-api.com';
 
 const buildGreenApiUrl = (
   idInstance: string,
-  method: 'checkAccount' | 'sendMessage',
+  method: GreenApiMethod,
   apiTokenInstance: string,
-) => `${API_URL}/waInstance${idInstance}/${method}/${apiTokenInstance}`;
+  path = '',
+) => `${API_URL}/waInstance${idInstance}/${method}/${apiTokenInstance}${path}`;
 
 const getErrorMessage = (data: unknown, fallback: string) => {
   if (!data || typeof data !== 'object') {
@@ -52,16 +101,18 @@ const getErrorMessage = (data: unknown, fallback: string) => {
   return errorData.reason || errorData.message || errorData.description || errorData.error || fallback;
 };
 
-const requestGreenApi = async <TResponse>(url: string, body: object): Promise<TResponse> => {
+const requestGreenApi = async <TResponse>(
+  url: string,
+  options: RequestInit = {},
+): Promise<TResponse> => {
   let response: Response;
 
   try {
     response = await fetch(url, {
-      method: 'POST',
       headers: {
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify(body),
+      ...options,
     });
   } catch {
     throw new Error('Не удалось выполнить запрос к GREEN-API. Проверьте подключение к сети.');
@@ -96,7 +147,10 @@ export const getChatIdByPhone = async ({
   const response = await requestGreenApi<CheckAccountResponse | CheckAccountErrorResponse>(
     buildGreenApiUrl(idInstance, 'checkAccount', apiTokenInstance),
     {
-      phoneNumber: Number(normalizedPhone),
+      method: 'POST',
+      body: JSON.stringify({
+        phoneNumber: Number(normalizedPhone),
+      }),
     },
   );
 
@@ -118,6 +172,39 @@ export const sendMessage = ({
   message,
 }: SendMessageRequest) =>
   requestGreenApi<SendMessageResponse>(buildGreenApiUrl(idInstance, 'sendMessage', apiTokenInstance), {
-    chatId,
-    message,
+    method: 'POST',
+    body: JSON.stringify({
+      chatId,
+      message,
+    }),
   });
+
+export const receiveNotification = ({
+  idInstance,
+  apiTokenInstance,
+}: GreenApiCredentials) =>
+  requestGreenApi<ReceiveNotificationResponse | null>(
+    `${buildGreenApiUrl(idInstance, 'receiveNotification', apiTokenInstance)}?receiveTimeout=5`,
+    {
+      method: 'GET',
+    },
+  );
+
+export const deleteNotification = async ({
+  idInstance,
+  apiTokenInstance,
+  receiptId,
+}: GreenApiCredentials & {
+  receiptId: number;
+}) => {
+  const response = await requestGreenApi<DeleteNotificationResponse>(
+    buildGreenApiUrl(idInstance, 'deleteNotification', apiTokenInstance, `/${receiptId}`),
+    {
+      method: 'DELETE',
+    },
+  );
+
+  if (!response.result) {
+    throw new Error(response.reason || 'Не удалось удалить уведомление из очереди.');
+  }
+};
